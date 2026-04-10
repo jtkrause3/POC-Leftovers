@@ -1,0 +1,16 @@
+message how to use the api in postman: 
+
+I have your API ready
+ 
+To call it you should just be able to do a POST to site nam
+ 
+You will need to put this in the Headers: 
+Key: x-api-key             Value: change-this-sandbox-secret
+ 
+and you will need to use form-data in the Body
+Key: file (type file)      Value: the file
+ 
+It should return something like this within 10 seconds or so: 
+{
+    json
+}
