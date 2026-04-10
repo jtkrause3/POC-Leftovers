@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Intelligent Document Assistant</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v=2">
+
+  <style>
+    /* ------------------------------------------------
+    # 1) CSS variables & reset
+    # ------------------------------------------------ */
+    :root{
+      --yellow:#d9e1ec;
+      --grey:#243447;
+      --blue:#46698b;
+      --red:#b85c5c;
+      --teal:#5d737e;
+      --lime:#6d8b74;
+      --lg:#eef2f6;
+      --white:#fff;
+      --border:#d5dde6;
+      --radius:8px;
+      --shadow-soft:0 2px 5px rgba(0,0,0,.05);
+      --shadow-strong:0 4px 12px rgba(0,0,0,.15);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      background:var(--lg);
+      color:var(--grey);
+      overflow:hidden;
+      font-size:16px;
+    }
+    ul{list-style:none}
+    a{text-decoration:none;color:inherit}
+    .hidden{display:none!important}
+
+    /* ------------------------------------------------
+    # 2) Layout: page, header, main
+    # ------------------------------------------------ */
+    .page{display:flex;flex-direction:column;height:100%}
+    header{
+      display:flex;
+      align-items:center;
+      padding:.7rem 1.2rem;
+      border-bottom:1px solid var(--border);
+      background:var(--white);
+      z-index:15;
+      box-shadow:0 1px 3px rgba(0,0,0,.05);
+    }
+    #menu-btn{
+      border:none;
+      background:none;
+      font-size:1.7rem;
+      margin-right:.8rem;
+      cursor:pointer;
+      color:var(--grey);
+    }
+    header h1{
+      flex:1;
+      text-align:center;
+      font-size:1.6rem;
+      font-weight:700;
+      color:var(--grey);
+    }
+    .auth{
+      display:flex;
+      align-items:center;
+      gap:.7rem;
+      font-size:.9rem;
+    }
+    .auth a{
+      background:var(--blue);
+      color:#fff;
+      padding:.4rem .9rem;
+      border-radius:5px;
+      font-weight:600;
+    }
+    .main{flex:1;display:flex;overflow:hidden}
+
+    /* ------------------------------------------------
+    # 2.1) Login screen (unauthenticated state)
+    # ------------------------------------------------ */
+    .login-main{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:2rem;
+    }
+    .login-card{
+      background:#fff;
+      border-radius:12px;
+      box-shadow:var(--shadow-strong);
+      padding:2rem 2.5rem;
+      max-width:420px;
+      width:100%;
+      text-align:center;
+      border:1px solid var(--border);
+    }
+    .login-card h2{
+      margin-bottom:.6rem;
+      color:var(--teal);
+      font-size:1.5rem;
+    }
+    .login-card p{
+      margin-bottom:1.2rem;
+      color:#555;
+      font-size:.95rem;
+      line-height:1.5;
+    }
+    .login-card .login-btn{
+      display:inline-block;
+      margin-top:.4rem;
+      padding:.7rem 1.4rem;
+      border-radius:999px;
+      background:var(--blue);
+      color:#fff;
+      font-weight:600;
+      border:none;
+      cursor:pointer;
+      font-size:.95rem;
+    }
+    .login-card small{
+      display:block;
+      margin-top:.8rem;
+      color:#888;
+      font-size:.8rem;
+    }
+
+    /* ------------------------------------------------
+    # 3) Sidebar (session list)
+    # ------------------------------------------------ */
+    #sidebar{
+      position:fixed;
+      top:0;left:0;
+      height:100%;
+      width:260px;
+      background:#fff;
+      border-right:1px solid var(--border);
+      padding:1.2rem 1.2rem 2rem;
+      overflow-y:auto;
+      transform:translateX(-100%);
+      transition:.3s;
+      z-index:14;
+    }
+    #sidebar.open{transform:translateX(0)}
+    #sidebar h2{margin-bottom:1rem;color:var(--teal)}
+    #new-session-btn-side{
+      width:100%;
+      padding:.7rem;
+      background:var(--lime);
+      color:#fff;
+      border:none;
+      border-radius:5px;
+      font-weight:600;
+      margin-bottom:1rem;
+      cursor:pointer;
+    }
+    #session-list-side li{
+      padding:.6rem;
+      background:var(--lg);
+      border-radius:4px;
+      margin-bottom:.4rem;
+      cursor:pointer;
+      border-left:4px solid transparent;
+      transition:.2s;
+      font-size:.9rem;
+    }
+    #session-list-side li:hover{background:#e0e0e0}
+    #session-list-side li.active{
+      background:#d4e6f1;
+      border-left-color:var(--blue);
+      font-weight:700;
+    }
+
+    /* ------------------------------------------------
+    # 4) Left column: dashboard, upload, summaries
+    # ------------------------------------------------ */
+    .left{
+      flex:1;
+      max-width:50%;
+      display:flex;
+      flex-direction:column;
+      overflow-y:auto;
+      background:var(--white);
+      padding:1.5rem;
+      border-right:1px solid var(--border);
+      position:relative;
+    }
+
+    #nav-btn{
+      position:sticky;
+      top:0;left:0;
+      margin-bottom:.8rem;
+      border:none;
+      background:var(--blue);
+      color:#fff;
+      padding:.5rem 1rem;
+      border-radius:6px;
+      font-weight:600;
+      cursor:pointer;
+      z-index:6;
+      display:inline-flex;
+      align-items:center;
+      gap:.4rem;
+      font-size:.9rem;
+    }
+    #nav-btn span.icon{font-size:1.1rem}
+    #nav-panel{
+      position:fixed;
+      top:70px;
+      left:280px;
+      width:260px;
+      height:70%;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:8px;
+      box-shadow:var(--shadow-strong);
+      overflow-y:auto;
+      padding:1rem;
+      z-index:20;
+    }
+    #nav-panel h4{margin-bottom:.5rem;color:var(--teal)}
+    #nav-panel li{margin-bottom:.4rem}
+    #nav-panel a{font-size:.9rem;color:var(--blue)}
+    #nav-panel a:hover{text-decoration:underline}
+    #nav-panel .close-nav{
+      display:block;
+      margin-top:1rem;
+      border:none;
+      background:#bbb;
+      color:#fff;
+      padding:.4rem .9rem;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:600;
+      width:100%;
+    }
+
+    #add-files-btn{
+      position:fixed;
+      left:calc(50% - 80px);
+      bottom:2.5rem;
+      width:55px;height:55px;
+      border-radius:50%;
+      background:var(--lime);
+      color:#fff;
+      font-size:36px;
+      line-height:0;
+      border:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      box-shadow:var(--shadow-strong);
+      cursor:pointer;
+      transform:scale(0);
+      opacity:0;
+      transition:.25s;
+      z-index:13;
+    }
+    #add-files-btn.show{transform:scale(1);opacity:1}
+
+    #session-dashboard h2{margin-bottom:.6rem;color:var(--teal)}
+    #session-dashboard p{font-size:.9rem;color:#666;margin-bottom:1rem}
+    #new-session-btn-main{
+      width:100%;
+      padding:.7rem;
+      background:var(--lime);
+      color:#fff;
+      border:none;
+      border-radius:5px;
+      font-weight:600;
+      margin-bottom:.1rem;
+      cursor:pointer;
+    }
+    #session-list-main{margin-top:.8rem;}
+    #session-list-main li{
+      background:var(--lg);
+      padding:.6rem;
+      border-radius:4px;
+      margin-bottom:.4rem;
+      cursor:pointer;
+      border-left:4px solid transparent;
+      transition:.2s;
+      font-size:.9rem;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:.5rem;
+    }
+    #session-list-main li:hover{background:#e0e0e0}
+    #session-list-main li.active{
+      background:#d4e6f1;
+      border-left-color:var(--blue);
+      font-weight:700;
+    }
+    .session-meta{
+      font-size:.75rem;
+      color:#777;
+      flex-shrink:0;
+    }
+
+    #upload-section{margin-top:1rem}
+    #upload-section h3{margin-bottom:.6rem;color:var(--teal)}
+    #session-name-input{
+      width:100%;
+      padding:.7rem;
+      border-radius:8px;
+      border:1px solid #ccc;
+      margin-bottom:.8rem;
+      font-size:1rem;
+    }
+    #file-drop-zone{
+      border:2px dashed var(--yellow);
+      border-radius:8px;
+      text-align:center;
+      background:#fcfcfc;
+      transition:.2s;
+    }
+    #file-drop-zone.drag-over{
+      background:#fff7e0;
+      border-color:var(--blue);
+    }
+    #file-drop-zone label{
+      display:block;
+      padding:2rem;
+      cursor:pointer;
+      font-size:.95rem;
+      color:#555;
+    }
+    #file-drop-zone label strong{
+      display:block;
+      margin-bottom:.2rem;
+      color:#222;
+    }
+    #process-btn{
+      margin-top:1rem;
+      width:100%;
+      padding:.85rem;
+      background:var(--yellow);
+      border:none;
+      border-radius:8px;
+      font-weight:700;
+      color:var(--grey);
+      cursor:pointer;
+      font-size:1rem;
+    }
+    #process-btn:disabled{background:#ccc;cursor:not-allowed}
+    #file-list-container{margin-top:.6rem}
+    #file-list-container h4{
+      font-size:.85rem;
+      font-weight:600;
+      margin-bottom:.3rem;
+      color:#555;
+    }
+    #file-list-display li{
+      background:#e9f5ff;
+      border-left:4px solid var(--teal);
+      padding:.4rem 1rem;
+      margin-bottom:.4rem;
+      border-radius:4px;
+      font-size:.88rem;
+    }
+
+    #status-container{
+      margin-top:1rem;
+      min-height:1.5rem;
+      font-size:.9rem;
+    }
+    .status-pill{
+      display:inline-flex;
+      align-items:flex-start;
+      gap:.45rem;
+      padding:.35rem .75rem;
+      border-radius:999px;
+      background:#eef2f7;
+      color:#444;
+      border:1px solid #dde3ea;
+      max-width:100%;
+      flex-wrap:wrap;
+    }
+    .status-pill.success{
+      background:#edf8ef;
+      border-color:#c5e7cc;
+      color:#0f6b33;
+    }
+    .status-pill.error{
+      background:#fdecec;
+      border-color:#f3b3b3;
+      color:#a12020;
+    }
+    .status-pill .label{
+      font-weight:600;
+      text-transform:uppercase;
+      font-size:.7rem;
+      letter-spacing:.06em;
+    }
+    .status-pill .estimate{
+      font-size:.8rem;
+      color:#666;
+    }
+
+    #results-toolbar{
+      margin-top:1rem;
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
+      gap:.5rem;
+    }
+    #export-all-pdf-btn{
+      padding:.5rem .9rem;
+      border-radius:999px;
+      border:1px solid var(--blue);
+      background:#f5f9ff;
+      color:var(--blue);
+      font-size:.85rem;
+      font-weight:600;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:.35rem;
+    }
+    #export-all-pdf-btn span.icon{font-size:1rem}
+
+    #results-container{margin-top:1rem}
+
+    .summary-card{
+      background:#fff;
+      border:1px solid #eee;
+      border-left:5px solid var(--blue);
+      border-radius:8px;
+      margin-bottom:1.2rem;
+      box-shadow:var(--shadow-soft);
+      overflow:hidden;
+    }
+    .summary-header{
+      padding:.75rem 1rem;
+      border-bottom:1px solid #eee;
+      font-weight:600;
+      color:var(--teal);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:.5rem;
+      font-size:.95rem;
+    }
+    .summary-header.error{
+      border-left-color:var(--red);
+      color:var(--red);
+    }
+    .summary-title{
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .summary-actions{
+      display:flex;
+      align-items:center;
+      gap:.35rem;
+      flex-shrink:0;
+    }
+    .summary-tag{
+      font-size:.7rem;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+      padding:.15rem .45rem;
+      border-radius:999px;
+      background:#eef2f7;
+      color:#555;
+    }
+    .summary-export{
+      border:none;
+      background:#f5f9ff;
+      color:var(--blue);
+      border-radius:999px;
+      padding:.25rem .5rem;
+      font-size:.75rem;
+      font-weight:600;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:.25rem;
+    }
+    .summary-export .icon{font-size:.9rem}
+    .summary-body{
+      padding:1.1rem 1.2rem 1.2rem;
+      line-height:1.6;
+      font-size:.92rem;
+    }
+    .summary-body p{margin-bottom:.4rem;}
+    .summary-body p:last-child{margin-bottom:0;}
+    .summary-body ul,
+    .summary-body ol,
+    .message-bubble ul,
+    .message-bubble ol{
+      margin:.45rem 0;
+      padding-left:1.25rem;
+    }
+    .summary-body ul,
+    .message-bubble ul{list-style:disc;}
+    .summary-body ol,
+    .message-bubble ol{list-style:decimal;}
+    .summary-body li,
+    .message-bubble li{margin-bottom:.2rem;}
+    .summary-body code,
+    .message-bubble code{
+      background:#e7edf4;
+      border-radius:4px;
+      padding:.05rem .3rem;
+      font-family:"Consolas","Courier New",monospace;
+      font-size:.92em;
+    }
+    .summary-body blockquote,
+    .message-bubble blockquote{
+      margin:.5rem 0;
+      padding:.1rem 0 .1rem .85rem;
+      border-left:3px solid var(--border);
+      color:#546371;
+    }
+
+    /* normalize tables inside summaries & chat (in case any sneak through) */
+    .summary-body table,
+    .message-bubble table{
+      border-collapse:collapse;
+      width:100%;
+    }
+    .summary-body th,
+    .summary-body td,
+    .message-bubble th,
+    .message-bubble td{
+      border:none;
+      padding:0;
+    }
+
+    /* ------------------------------------------------
+    # 5) Right column: QA / chat
+    # ------------------------------------------------ */
+    .right{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      background:var(--white);
+      overflow:hidden;
+    }
+    #qa-section{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      padding:1.5rem;
+      overflow:hidden;
+    }
+    #qa-section h2{
+      text-align:center;
+      margin-bottom:1.2rem;
+      color:var(--teal);
+    }
+    #chat-history{
+      flex:1;
+      overflow-y:auto;
+      background:var(--lg);
+      padding:1rem;
+      border-radius:8px;
+      border:1px solid #e0e0e0;
+    }
+    .chat-message{
+      max-width:100%;
+      margin-bottom:1rem;
+      display:flex;
+      flex-direction:column;
+    }
+    .user-message{align-items:flex-end}
+    .bot-message{align-items:flex-start}
+    .message-bubble{
+      padding:.75rem 1.25rem;
+      border-radius:18px;
+      line-height:1.5;
+      max-width:85%;
+    }
+    .user-message .message-bubble{
+      background:var(--yellow);
+      color:var(--grey);
+      border-bottom-right-radius:4px;
+      margin-left:auto;
+    }
+    .bot-message .message-bubble{
+      background:#fff;
+      border:1px solid #eee;
+      border-bottom-left-radius:4px;
+      width:auto;
+      max-width:100%;
+    }
+    .bot-message.thinking .message-bubble{
+      color:#777;
+      width:auto;
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+    }
+    .message-bubble p{margin-bottom:.4rem;}
+    .message-bubble p:last-child{margin-bottom:0;}
+
+    .chat-input{
+      display:flex;
+      gap:1rem;
+      margin-top:1.3rem;
+      padding-top:1.3rem;
+      border-top:1px solid #eee;
+    }
+    #qa-input{
+      flex:1;
+      padding:.7rem;
+      border-radius:8px;
+      border:1px solid #ccc;
+      font-size:1rem;
+      resize:none;
+      min-height:48px;
+      max-height:180px;
+    }
+    #ask-btn{
+      padding:.75rem 1.35rem;
+      background:var(--blue);
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      font-weight:600;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:.35rem;
+    }
+    #ask-btn:disabled{background:#ccc;cursor:not-allowed}
+
+    .context-toggle{
+      font-size:.75rem;
+      color:var(--blue);
+      text-decoration:underline;
+      margin-top:.35rem;
+      cursor:pointer;
+    }
+    .context-box{
+      border:1px dashed #ccc;
+      background:#fafafa;
+      padding:.7rem;
+      margin-top:.3rem;
+      border-radius:8px;
+      max-height:200px;
+      overflow-y:auto;
+      font-size:.8rem;
+    }
+    .context-source{
+      font-weight:700;
+      color:var(--teal);
+    }
+    .context-text{
+      white-space:pre-wrap;
+      margin-top:.25rem;
+      border-top:1px solid #eee;
+      padding-top:.25rem;
+    }
+
+    /* ------------------------------------------------
+    # 6) Modals
+    # ------------------------------------------------ */
+    #add-modal,#rename-modal{
+      position:fixed;
+      top:0;left:0;
+      width:100%;height:100%;
+      background:rgba(0,0,0,.55);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:99;
+    }
+    #add-modal .box,#rename-modal .box{
+      background:#fff;
+      padding:2rem;
+      border-radius:10px;
+      width:340px;
+      max-width:90%;
+      box-shadow:var(--shadow-strong);
+    }
+    #add-modal h3,#rename-modal h3{
+      margin-top:0;
+      margin-bottom:1rem;
+      color:var(--teal);
+    }
+    #add-modal input[type="file"]{
+      width:100%;
+      margin-bottom:.6rem;
+    }
+    #add-modal button,#rename-modal button{
+      margin-top:1rem;
+      padding:.6rem 1rem;
+      border:none;
+      border-radius:6px;
+      font-weight:600;
+      cursor:pointer;
+      font-size:.9rem;
+    }
+    #add-modal .close,#rename-modal .cancel{
+      background:#bbb;
+      color:#fff;
+      margin-right:.6rem;
+    }
+    #add-modal .go,#rename-modal .save{
+      background:var(--blue);
+      color:#fff;
+    }
+    #add-file-list{
+      margin-top:.1rem;
+      max-height:120px;
+      overflow-y:auto;
+      font-size:.9rem;
+    }
+    #add-file-list li{
+      background:#e9f5ff;
+      border-left:4px solid var(--teal);
+      padding:.3rem .7rem;
+      margin-bottom:.3rem;
+      border-radius:4px;
+    }
+
+    /* ------------------------------------------------
+    # 7) Spinner + jump-to-bottom
+    # ------------------------------------------------ */
+    .spinner{
+      border:3px solid rgba(0,0,0,.08);
+      border-top:3px solid var(--blue);
+      border-radius:50%;
+      width:16px;height:16px;
+      animation:spin 1s linear infinite;
+      margin-top:2px;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    #jump-to-bottom{
+      display:none;
+      position:fixed;
+      right:1rem;
+      bottom:6.5rem;
+      z-index:99;
+      padding:.6rem .9rem;
+      border:none;
+      border-radius:999px;
+      font-weight:700;
+      background:var(--blue);
+      color:#fff;
+      box-shadow:var(--shadow-strong);
+      cursor:pointer;
+      font-size:.8rem;
+    }
+    #jump-to-bottom.show{
+      display:inline-flex;
+      align-items:center;
+      gap:.4rem;
+    }
+    #jump-to-bottom .dot{
+      width:8px;height:8px;
+      border-radius:50%;
+      background:var(--lime);
+      display:inline-block;
+    }
+
+    /* ------------------------------------------------
+    # 8) Mobile tweaks
+    # ------------------------------------------------ */
+    @media (max-width:960px){
+      .left{max-width:100%}
+      .right{display:none}
+      #add-files-btn{left:auto;right:1.5rem}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ------------------------------------------------
+       2.1) Header with auth
+       ------------------------------------------------ -->
+  <header>
+    <button id="menu-btn" type="button">☰</button>
+    <h1>Intelligent Document Assistant</h1>
+    <div class="auth">
+      {% if user %}
+        <span>{{ user.display_name or user.email }}</span>
+        <a href="/logout">Sign out</a>
+      {% else %}
+        <a href="/login">Sign in</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if user %}
+  <!-- ------------------------------------------------
+       2.2) Main layout (sidebar + left + right)
+       ------------------------------------------------ -->
+  <div class="main">
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <h2>Sessions</h2>
+      <button id="new-session-btn-side" type="button">+ New Session</button>
+      <ul id="session-list-side"></ul>
+    </aside>
+
+    <!-- Left column: dashboard + upload + summaries -->
+    <section class="left">
+
+      <!-- Document nav button + panel -->
+      <button id="nav-btn" type="button" class="hidden">
+        <span class="icon">📄</span>
+        Document Navigator
+      </button>
+
+      <div id="nav-panel" class="hidden">
+        <h4>Documents in this session</h4>
+        <ul id="doc-nav-list"></ul>
+        <button type="button" class="close-nav">Close</button>
+      </div>
+
+      <!-- Dashboard -->
+      <section id="session-dashboard">
+        <h2>Your Sessions</h2>
+        <p>Select a previous run or start a new one to analyze documents.</p>
+        <button id="new-session-btn-main" type="button">+ Start New Session</button>
+        <ul id="session-list-main"></ul>
+      </section>
+
+      <!-- Upload section (hidden until "new session") -->
+      <section id="upload-section" class="hidden">
+        <h3>Upload Documents</h3>
+        <input id="session-name-input" type="text" placeholder="Optional session name (e.g. Project Alpha - Reference Pack)">
+        <div id="file-drop-zone">
+          <label>
+            <strong>Drop files here or click to browse</strong>
+            <span>PDF, DOCX, XLSX, CSV, TXT, PPTX</span>
+            <input id="file-input" type="file" multiple style="display:none">
+          </label>
+        </div>
+
+        <div id="file-list-container" class="hidden">
+          <h4>Selected files</h4>
+          <ul id="file-list-display"></ul>
+        </div>
+
+        <button id="process-btn" type="button" disabled>Analyze &amp; Create Session</button>
+      </section>
+
+      <!-- Status + results -->
+      <div id="status-container"></div>
+
+      <div id="results-toolbar" class="hidden">
+        <button id="export-all-pdf-btn" type="button">
+          <span class="icon">⬇︎</span>
+          <span>Export all summaries (PDF)</span>
+        </button>
+      </div>
+
+      <div id="results-container"></div>
+    </section>
+
+    <!-- Right column: QA/chat -->
+    <section class="right">
+      <div id="qa-section" class="hidden">
+        <h2>Ask Questions About Your Documents</h2>
+        <div id="chat-history"></div>
+        <div class="chat-input">
+          <textarea id="qa-input" placeholder="Ask a question about the uploaded documents…"></textarea>
+          <button id="ask-btn" type="button" disabled>Ask</button>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.main -->
+
+  <!-- Floating add-files button -->
+  <button id="add-files-btn" type="button">+</button>
+
+  <!-- ------------------------------------------------
+       6) Modals
+       ------------------------------------------------ -->
+  <div id="add-modal" class="hidden">
+    <div class="box">
+      <h3>Add files to this session</h3>
+      <input id="add-file-input" type="file" multiple>
+      <ul id="add-file-list"></ul>
+      <button type="button" class="close">Cancel</button>
+      <button type="button" class="go">Add &amp; Process</button>
+    </div>
+  </div>
+
+  <div id="rename-modal" class="hidden">
+    <div class="box">
+      <h3>Rename session</h3>
+      <input id="rename-input" type="text" placeholder="New session name">
+      <button type="button" class="cancel">Cancel</button>
+      <button type="button" class="save">Save</button>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+      const qs = (s, p=document) => p.querySelector(s);
+      const escapeHTML = s => {
+        const d=document.createElement('p');
+        d.textContent=s ?? '';
+        return d.innerHTML;
+      };
+      const allowedExt = ['pdf','docx','xlsx','csv','txt','pptx'];
+      const isAllowed = f => allowedExt.includes((f.name||'').split('.').pop().toLowerCase());
+      const isNearBottom = (el, threshold=120) =>
+        (el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+
+      function formatInlineMarkdown(text){
+        return escapeHTML(text || '')
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>');
+      }
+
+      // ------------------------------------------------
+      // Render a small, safe markdown subset without external dependencies.
+      // ------------------------------------------------
+      function renderMarkdown(mdText){
+        if (!mdText) return '';
+        try{
+          const lines = String(mdText).replace(/\r\n/g, '\n').split('\n');
+          const parts = [];
+          let inUl = false;
+          let inOl = false;
+
+          const closeLists = () => {
+            if (inUl){
+              parts.push('</ul>');
+              inUl = false;
+            }
+            if (inOl){
+              parts.push('</ol>');
+              inOl = false;
+            }
+          };
+
+          lines.forEach(line => {
+            const bulletMatch = line.match(/^\s*(?:[-*•])\s+(.*)$/);
+            const orderedMatch = line.match(/^\s*\d+\.\s+(.*)$/);
+            const quoteMatch = line.match(/^\s*>\s?(.*)$/);
+            const trimmed = line.trim();
+
+            if (!trimmed){
+              closeLists();
+              return;
+            }
+
+            if (bulletMatch){
+              if (inOl){
+                parts.push('</ol>');
+                inOl = false;
+              }
+              if (!inUl){
+                parts.push('<ul>');
+                inUl = true;
+              }
+              parts.push(`<li>${formatInlineMarkdown(bulletMatch[1])}</li>`);
+              return;
+            }
+
+            if (orderedMatch){
+              if (inUl){
+                parts.push('</ul>');
+                inUl = false;
+              }
+              if (!inOl){
+                parts.push('<ol>');
+                inOl = true;
+              }
+              parts.push(`<li>${formatInlineMarkdown(orderedMatch[1])}</li>`);
+              return;
+            }
+
+            closeLists();
+
+            if (quoteMatch){
+              parts.push(`<blockquote>${formatInlineMarkdown(quoteMatch[1])}</blockquote>`);
+              return;
+            }
+
+            parts.push(`<p>${formatInlineMarkdown(line)}</p>`);
+          });
+
+          closeLists();
+          return parts.join('');
+        }catch(e){
+          return '<p>' + escapeHTML(mdText) + '</p>';
+        }
+      }
+
+      // Helper: background download via hidden iframe + POST form
+      function postDownload(url, payload){
+        const frameId = 'ida-download-frame';
+        let frame = document.getElementById(frameId);
+        if (!frame){
+          frame = document.createElement('iframe');
+          frame.id = frameId;
+          frame.name = frameId;
+          frame.style.display = 'none';
+          document.body.appendChild(frame);
+        }
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        form.target = frameId;
+
+        Object.entries(payload || {}).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        setTimeout(() => form.remove(), 1000);
+      }
+
+      const ui = {
+        sidebar: qs('#sidebar'),
+        menuBtn: qs('#menu-btn'),
+
+        newMain: qs('#new-session-btn-main'),
+        newSide: qs('#new-session-btn-side'),
+        listMain: qs('#session-list-main'),
+        listSide: qs('#session-list-side'),
+        dash: qs('#session-dashboard'),
+        upload: qs('#upload-section'),
+        sessionName: qs('#session-name-input'),
+
+        fileInput: qs('#file-input'),
+        fileListC: qs('#file-list-container'),
+        fileDisp: qs('#file-list-display'),
+        process: qs('#process-btn'),
+        drop: qs('#file-drop-zone'),
+        status: qs('#status-container'),
+
+        resultsToolbar: qs('#results-toolbar'),
+        exportAllPdf: qs('#export-all-pdf-btn'),
+        results: qs('#results-container'),
+
+        navBtn: qs('#nav-btn'),
+        navPanel: qs('#nav-panel'),
+        navClose: qs('#nav-panel .close-nav'),
+        docList: qs('#doc-nav-list'),
+
+        qaSec: qs('#qa-section'),
+        chatHist: qs('#chat-history'),
+        qaInput: qs('#qa-input'),
+        askBtn: qs('#ask-btn'),
+
+        addBtn: qs('#add-files-btn'),
+        addModal: qs('#add-modal'),
+        addInput: qs('#add-file-input'),
+        addGo: qs('#add-modal .go'),
+        addClose: qs('#add-modal .close'),
+        addList: qs('#add-file-list'),
+
+        renameModal: qs('#rename-modal'),
+        renameInput: qs('#rename-input'),
+        renameSave: qs('#rename-modal .save'),
+        renameCancel: qs('#rename-modal .cancel')
+      };
+
+      let currentSession = null;
+      let conversation = [];
+      let renameTarget = null;
+      let followBottom = true;
+      let jumpBtn = null;
+      let lastProcessingEstimate = '';
+
+      function setupJumpButton(){
+        if (jumpBtn) return;
+        jumpBtn = document.createElement('button');
+        jumpBtn.id = 'jump-to-bottom';
+        jumpBtn.type = 'button';
+        jumpBtn.innerHTML = '<span class="dot"></span> Jump to latest ↓';
+        jumpBtn.addEventListener('click', () => {
+          followBottom = true;
+          hideJumpButton();
+          ui.chatHist.scrollTo({ top: ui.chatHist.scrollHeight, behavior: 'smooth' });
+        });
+        document.body.appendChild(jumpBtn);
+      }
+      function showJumpButton(){ setupJumpButton(); jumpBtn.classList.add('show'); }
+      function hideJumpButton(){ if (jumpBtn) jumpBtn.classList.remove('show'); }
+
+      ui.menuBtn?.addEventListener('click', () => ui.sidebar.classList.toggle('open'));
+      document.addEventListener('click', (e) => {
+        if (ui.sidebar?.classList.contains('open') && !ui.sidebar.contains(e.target) && e.target !== ui.menuBtn) {
+          ui.sidebar.classList.remove('open');
+        }
+      });
+
+      if (ui.navBtn && ui.navPanel && ui.navClose) {
+        ui.navBtn.onclick = () => ui.navPanel.classList.toggle('hidden');
+        ui.navClose.onclick = () => ui.navPanel.classList.add('hidden');
+      }
+
+      function attachRename(li){
+        li.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          if (!ui.renameModal || !ui.renameInput) return;
+          renameTarget = li;
+          ui.renameInput.value = li.textContent.trim();
+          ui.renameModal.classList.remove('hidden');
+          ui.renameInput.focus();
+        });
+      }
+      if (ui.renameCancel && ui.renameModal){
+        ui.renameCancel.onclick = () => ui.renameModal.classList.add('hidden');
+      }
+      if (ui.renameSave){
+        ui.renameSave.onclick = async () => {
+          const nn = ui.renameInput.value.trim();
+          if (!nn || !renameTarget) return;
+          const id = renameTarget.dataset.id;
+          ui.renameSave.disabled = true;
+          try{
+            await fetch('/api/rename_session', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({ session_id:id, new_name:nn })
+            });
+          } finally {
+            ui.renameSave.disabled = false;
+          }
+          ui.renameModal.classList.add('hidden');
+          loadSessions();
+        };
+      }
+
+      async function loadSessions(){
+        let res;
+        try{
+          res = await fetch('/api/sessions', { cache:'no-store' });
+        }catch{ return; }
+        if (!res.ok) return;
+        const list = await res.json();
+
+        const build = (ul) => {
+          ul.innerHTML = '';
+          if (!list.length){
+            ul.innerHTML = '<li>No sessions yet.</li>';
+            return;
+          }
+          list.forEach(it => {
+            const id = it.id || it;
+            const nm = it.display_name || id.replace(/_/g,' ');
+            const li = document.createElement('li');
+            li.textContent = nm;
+            li.dataset.id = id;
+            if (id === currentSession) li.classList.add('active');
+            li.onclick = () => { ui.sidebar?.classList.remove('open'); openSession(id); };
+            attachRename(li);
+            ul.appendChild(li);
+          });
+        };
+        if (ui.listMain) build(ui.listMain);
+        if (ui.listSide) build(ui.listSide);
+      }
+
+      function resetUI(){
+        conversation = [];
+        if (ui.chatHist) ui.chatHist.innerHTML = '';
+
+        if (ui.upload) ui.upload.classList.add('hidden');
+        if (ui.results) ui.results.innerHTML = '';
+        if (ui.resultsToolbar) ui.resultsToolbar.classList.add('hidden');
+        if (ui.status) ui.status.innerHTML = '';
+
+        if (ui.qaSec) ui.qaSec.classList.add('hidden');
+
+        if (ui.fileInput) ui.fileInput.value = '';
+        if (ui.fileListC) ui.fileListC.classList.add('hidden');
+        if (ui.fileDisp) ui.fileDisp.innerHTML = '';
+        if (ui.sessionName) ui.sessionName.value = '';
+        if (ui.process) ui.process.disabled = true;
+
+        if (ui.addBtn) ui.addBtn.classList.remove('show');
+        if (ui.navBtn) ui.navBtn.classList.add('hidden');
+        if (ui.navPanel) ui.navPanel.classList.add('hidden');
+
+        followBottom = true;
+        hideJumpButton();
+        lastProcessingEstimate = '';
+      }
+
+      function startNew(){
+        currentSession = null;
+        resetUI();
+        if (ui.dash) ui.dash.classList.add('hidden');
+        if (ui.upload) ui.upload.classList.remove('hidden');
+        ui.sessionName?.focus();
+      }
+
+      if (ui.newMain) ui.newMain.onclick = startNew;
+      if (ui.newSide){
+        ui.newSide.onclick = () => {
+          ui.sidebar?.classList.remove('open');
+          startNew();
+        };
+      }
+
+      async function openSession(id){
+        currentSession = id;
+        resetUI();
+        if (ui.status){
+          ui.status.innerHTML = `
+            <div class="status-pill">
+              <span class="spinner"></span>
+              <span class="label">Loading</span>
+              <span>Restoring session…</span>
+            </div>`;
+        }
+
+        let res;
+        try{
+          res = await fetch('/api/session_data/'+encodeURIComponent(id), { cache:'no-store' });
+        }catch{
+          if (ui.status){
+            ui.status.innerHTML = `
+              <div class="status-pill error">
+                <span class="label">Error</span>
+                <span>Unable to reach server.</span>
+              </div>`;
+          }
+          return;
+        }
+        if(!res.ok){
+          if (ui.status){
+            ui.status.innerHTML = `
+              <div class="status-pill error">
+                <span class="label">Error</span>
+                <span>Could not load session.</span>
+              </div>`;
+          }
+          return;
+        }
+        const d = await res.json();
+
+        Object.values(d.summaries || {}).forEach(addCard);
+        conversation = d.chat_history || [];
+        if (!conversation.length) conversation = [{ role:'bot', text:'Session loaded. Ask a question to begin.' }];
+
+        renderChatInitial();
+        if (ui.chatHist){
+          ui.chatHist.scrollTop = ui.chatHist.scrollHeight;
+        }
+        followBottom = true;
+        hideJumpButton();
+
+        if (ui.qaSec) ui.qaSec.classList.remove('hidden');
+        if (ui.dash) ui.dash.classList.add('hidden');
+        if (ui.status){
+          ui.status.innerHTML = `
+            <div class="status-pill success">
+              <span class="label">Ready</span>
+              <span>Session loaded.</span>
+            </div>`;
+        }
+        if (ui.addBtn) ui.addBtn.classList.add('show');
+        buildNav();
+        updateResultsToolbar();
+        loadSessions();
+
+        // Enable chat button once we have a session
+        if (ui.askBtn) ui.askBtn.disabled = false;
+      }
+
+      [ui.listMain, ui.listSide].forEach(list => {
+        if (!list) return;
+        list.addEventListener('click', e => {
+          const li = e.target.closest('li[data-id]');
+          if (!li) return;
+          ui.listMain?.querySelectorAll('li').forEach(x => x.classList.remove('active'));
+          ui.listSide?.querySelectorAll('li').forEach(x => x.classList.remove('active'));
+          const id = li.dataset.id;
+          ui.listMain?.querySelectorAll('li').forEach(x => { if (x.dataset.id===id) x.classList.add('active'); });
+          ui.listSide?.querySelectorAll('li').forEach(x => { if (x.dataset.id===id) x.classList.add('active'); });
+        }, true);
+      });
+
+      ui.chatHist?.addEventListener('scroll', () => {
+        if (isNearBottom(ui.chatHist)){
+          followBottom = true;
+          hideJumpButton();
+        } else {
+          followBottom = false;
+        }
+      });
+
+      ui.fileInput?.addEventListener('change', () => selectFiles(ui.fileInput.files));
+      ui.drop?.addEventListener('dragover', e => {
+        e.preventDefault();
+        ui.drop.classList.add('drag-over');
+      });
+      ui.drop?.addEventListener('dragleave', () => ui.drop.classList.remove('drag-over'));
+      ui.drop?.addEventListener('drop', e => {
+        e.preventDefault();
+        ui.drop.classList.remove('drag-over');
+        ui.fileInput.files = e.dataTransfer.files;
+        selectFiles(ui.fileInput.files);
+      });
+
+      function selectFiles(files){
+        const good = [...files].filter(isAllowed);
+        if (ui.fileListC) ui.fileListC.classList.toggle('hidden', !good.length);
+        if (ui.fileDisp) ui.fileDisp.innerHTML = good.map(f => `<li>${escapeHTML(f.name)}</li>`).join('');
+        if (ui.process) ui.process.disabled = !good.length;
+      }
+
+      // ------------------------------------------------
+      // Estimate builder (files -> rough time window)
+      // ------------------------------------------------
+      function buildEstimateForFiles(files){
+        const totalBytes = files.reduce((acc,f) => acc + (f.size || 0), 0);
+        const mb = totalBytes / (1024*1024);
+        const roundedMb = mb < 1 ? '<1' : Math.round(mb);
+        let eta;
+        if (mb < 20){
+          eta = 'about 1–4 minutes';
+        } else if (mb < 50){
+          eta = 'about 3–7 minutes';
+        } else if (mb < 100){
+          eta = 'about 5–15 minutes';
+        } else if (mb < 200){
+          eta = 'about 10–25 minutes';          
+        } else {
+          eta = 'long run time: 20+ minutes (large document set)';
+        }
+        const count = files.length;
+        lastProcessingEstimate = `${count} document${count!==1?'s':''} (~${roundedMb} MB) – ${eta}`;
+        return lastProcessingEstimate;
+      }
+
+      // ------------------------------------------------
+      // Async job helpers for initial document processing
+      // ------------------------------------------------
+      async function pollJob(jobId, sessionIdFromServer){
+        const pollDelayMs = 5000;   // 5s
+        const maxPolls    = 720;    // ~1 hour
+
+        const ACTIVE_STATUSES  = new Set(['queued','running','processing','pending','created']);
+        const SUCCESS_STATUSES = new Set(['completed','success','succeeded','done']);
+        const ERROR_STATUSES   = new Set(['failed','error','expired','cancelled','canceled']);
+
+        let polls = 0;
+
+        while (polls < maxPolls){
+          let res;
+          try {
+            res = await fetch('/api/job_status/' + encodeURIComponent(jobId), {
+              cache: 'no-store'
+            });
+          } catch (err){
+            // transient network blip – show a message but keep trying
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">Waiting</span>
+                <span>Temporary network issue while checking job status…</span>
+                ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+              </div>`;
+            polls++;
+            await new Promise(r => setTimeout(r, pollDelayMs));
+            continue;
+          }
+
+          // If backend isn't ready yet and returns 404, treat as "queued" instead of hard error
+          if (!res.ok){
+            if (res.status === 404){
+              ui.status.innerHTML = `
+                <div class="status-pill">
+                  <span class="spinner"></span>
+                  <span class="label">Queued</span>
+                  <span>Waiting for background job to start…</span>
+                  ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+                </div>`;
+              polls++;
+              await new Promise(r => setTimeout(r, pollDelayMs));
+              continue;
+            }
+
+            ui.status.innerHTML = `
+              <div class="status-pill error">
+                <span class="label">Error</span>
+                <span>Failed to check job status (HTTP ${res.status}).</span>
+              </div>`;
+            ui.process.disabled = false;
+            return;
+          }
+
+          let job;
+          try {
+            job = await res.json();
+          } catch (err){
+            // Garbage / partial JSON – don't kill the flow, just keep polling
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">Waiting</span>
+                <span>Job status not ready yet…</span>
+                ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+              </div>`;
+            polls++;
+            await new Promise(r => setTimeout(r, pollDelayMs));
+            continue;
+          }
+
+          const rawStatus = (job.status || '').toLowerCase().trim();
+          const status    = rawStatus || 'queued'; // default to queued if missing
+          const msg       = job.message || '';
+          const errMsg    = job.error   || '';
+          const sid       = sessionIdFromServer || job.session_id || currentSession;
+
+          if (ACTIVE_STATUSES.has(status)){
+            const text = msg || 'Analyzing selected documents…';
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">${status === 'queued' ? 'Queued' : 'Processing'}</span>
+                <span>${escapeHTML(text)}</span>
+                ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+              </div>`;
+          }
+          else if (SUCCESS_STATUSES.has(status)){
+            ui.status.innerHTML = `
+              <div class="status-pill success">
+                <span class="label">Ready</span>
+                <span>Documents processed. You can start asking questions.</span>
+              </div>`;
+
+            if (sid){
+              await openSession(sid);
+            }
+
+            ui.process.disabled = false;
+            lastProcessingEstimate = '';
+            return;
+          }
+          else if (ERROR_STATUSES.has(status)){
+            ui.status.innerHTML = `
+              <div class="status-pill error">
+                <span class="label">Error</span>
+                <span>${escapeHTML(errMsg || msg || 'The background job failed.')}</span>
+              </div>`;
+            ui.process.disabled = false;
+            lastProcessingEstimate = '';
+            return;
+          }
+          else {
+            // Any weird / unexpected status – log it visually but keep polling
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">Processing</span>
+                <span>${escapeHTML(
+                  msg ||
+                  `Job reported status "${status || 'unknown'}" – continuing to wait…`
+                )}</span>
+                ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+              </div>`;
+          }
+
+          polls++;
+          await new Promise(r => setTimeout(r, pollDelayMs));
+        }
+
+        ui.status.innerHTML = `
+          <div class="status-pill error">
+            <span class="label">Error</span>
+            <span>Timed out while waiting for documents to finish processing.</span>
+          </div>`;
+        ui.process.disabled = false;
+        lastProcessingEstimate = '';
+      }
+
+
+      // ------------------------------------------------
+      // Initial "Analyze & Create Session" → async job
+      // ------------------------------------------------
+      if (ui.process){
+        ui.process.onclick = async () => {
+          const files = [...ui.fileInput.files].filter(isAllowed);
+          if (!files.length) return;
+
+          const fd = new FormData();
+          files.forEach(f => fd.append('files', f));
+          const sName = ui.sessionName.value.trim();
+          if (sName) fd.append('display_name', sName);
+
+          const estimateText = buildEstimateForFiles(files);
+
+          ui.process.disabled = true;
+          if (ui.status){
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">Queued</span>
+                <span>Submitting documents for background processing…</span>
+                ${estimateText ? `<span class="estimate">${escapeHTML(estimateText)}</span>` : ''}
+              </div>`;
+          }
+
+          let res;
+          try{
+            res = await fetch('/api/process_files', {
+              method: 'POST',
+              body: fd
+            });
+          }catch(err){
+            if (ui.status){
+              ui.status.innerHTML = `
+                <div class="status-pill error">
+                  <span class="label">Error</span>
+                  <span>Network error while starting document processing.</span>
+                </div>`;
+            }
+            ui.process.disabled = false;
+            lastProcessingEstimate = '';
+            return;
+          }
+
+          if (!res.ok){
+            if (ui.status){
+              ui.status.innerHTML = `
+                <div class="status-pill error">
+                  <span class="label">Error</span>
+                  <span>Failed to start document processing (HTTP ${res.status}).</span>
+                </div>`;
+            }
+            ui.process.disabled = false;
+            lastProcessingEstimate = '';
+            return;
+          }
+
+          let data;
+          try{
+            data = await res.json();
+          }catch(err){
+            if (ui.status){
+              ui.status.innerHTML = `
+                <div class="status-pill error">
+                  <span class="label">Error</span>
+                  <span>Server returned an invalid response when starting the job.</span>
+                </div>`;
+            }
+            ui.process.disabled = false;
+            lastProcessingEstimate = '';
+            return;
+          }
+
+          const jobId               = data.job_id    || data.jobId;
+          const sessionIdFromServer = data.session_id || data.sessionId;
+
+          if (!jobId){
+            if (ui.status){
+              ui.status.innerHTML = `
+                <div class="status-pill error">
+                  <span class="label">Error</span>
+                  <span>Job id was not returned by the server.</span>
+                </div>`;
+            }
+            ui.process.disabled = false;
+            lastProcessingEstimate = '';
+            return;
+          }
+
+          if (sessionIdFromServer){
+            currentSession = sessionIdFromServer;
+          }
+
+          if (ui.status){
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">Processing</span>
+                <span>Analyzing selected documents…</span>
+                ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+              </div>`;
+          }
+
+          await pollJob(jobId, sessionIdFromServer);
+        };
+      }
+
+      // ------------------------------------------------
+      // Add files to existing session → still SSE
+      // ------------------------------------------------
+      if (ui.addBtn){
+        ui.addBtn.onclick = () => ui.addModal?.classList.remove('hidden');
+      }
+      if (ui.addClose){
+        ui.addClose.onclick = () => ui.addModal?.classList.add('hidden');
+      }
+      ui.addInput?.addEventListener('change', () => {
+        const files = [...ui.addInput.files].filter(isAllowed);
+        if (ui.addList) ui.addList.innerHTML = files.map(f => `<li>${escapeHTML(f.name)}</li>`).join('');
+      });
+
+      if (ui.addGo){
+        ui.addGo.onclick = async () => {
+          const good = [...ui.addInput.files].filter(isAllowed);
+          if (!good.length || !currentSession) return;
+
+          const fd = new FormData();
+          good.forEach(f => fd.append('files', f));
+          fd.append('session_id', currentSession);
+
+          buildEstimateForFiles(good);
+
+          ui.addModal?.classList.add('hidden');
+          if (ui.status){
+            ui.status.innerHTML = `
+              <div class="status-pill">
+                <span class="spinner"></span>
+                <span class="label">Processing</span>
+                <span>Adding documents to session…</span>
+                ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+              </div>`;
+          }
+
+          await sseFetch('/api/add_files', {
+            method:'POST',
+            body:fd
+          }, handleSessionBuildEvent);
+
+          ui.addInput.value = '';
+          if (ui.addList) ui.addList.innerHTML = '';
+        };
+      }
+
+      // ------------------------------------------------
+      // Generic SSE helper (chat + add_files)
+      // ------------------------------------------------
+      async function sseFetch(url, fetchOptions = {}, onEvent){
+        const baseHeaders = { Accept: 'text/event-stream' };
+        if (fetchOptions.headers && typeof fetchOptions.headers === 'object') {
+          Object.assign(baseHeaders, fetchOptions.headers);
+        }
+
+        const options = {
+          ...fetchOptions,
+          headers: baseHeaders,
+          cache: 'no-store',
+        };
+
+        let res;
+        try {
+          res = await fetch(url, options);
+        } catch (err) {
+          onEvent({ type:'error', message:'Network error. Please check your connection.' });
+          return;
+        }
+        if (!res.ok){
+          onEvent({ type:'error', message:`Request failed (HTTP ${res.status}).` });
+          return;
+        }
+        if (!res.body || !res.body.getReader){
+          onEvent({ type:'error', message:'Streaming not supported in this browser/environment.' });
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (true){
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream:true });
+
+            const frames = buffer.split(/\r?\n\r?\n/);
+            buffer = frames.pop() || '';
+
+            for (const frame of frames){
+              const lines = frame.split(/\r?\n/);
+              const dataLines = lines
+                .filter(l => l.startsWith('data:'))
+                .map(l => l.replace(/^data:\s?/, ''));
+
+              if (!dataLines.length) continue;
+
+              let payload;
+              try {
+                payload = JSON.parse(dataLines.join('\n'));
+              } catch {
+                try { payload = JSON.parse(dataLines[0]); }
+                catch { continue; }
+              }
+              onEvent(payload);
+            }
+          }
+
+          const tail = decoder.decode();
+          if (tail) {
+            buffer += tail;
+          }
+
+        } catch (err) {
+          onEvent({ type:'error', message:String(err) });
+        }
+      }
+
+      // ------------------------------------------------
+      // SSE event handler for add_files summaries
+      // ------------------------------------------------
+      function handleSessionBuildEvent(ev){
+        if (ev.type === 'summary') {
+          addCard(ev.data);
+          updateResultsToolbar();
+        }
+
+        if (ev.type === 'status' && ui.status){
+          const baseMsg = ev.message || 'Working…';
+          ui.status.innerHTML = `
+            <div class="status-pill">
+              <span class="spinner"></span>
+              <span class="label">Processing</span>
+              <span>${escapeHTML(baseMsg)}</span>
+              ${lastProcessingEstimate ? `<span class="estimate">${escapeHTML(lastProcessingEstimate)}</span>` : ''}
+            </div>`;
+        }
+
+        if (ev.type === 'complete'){
+          if (!currentSession) currentSession = ev.session_id;
+
+          conversation = [];
+          if (ui.chatHist) ui.chatHist.innerHTML = '';
+
+          if (ui.upload) ui.upload.classList.add('hidden');
+          if (ui.fileInput) ui.fileInput.value = '';
+          if (ui.fileListC) ui.fileListC.classList.add('hidden');
+          if (ui.fileDisp) ui.fileDisp.innerHTML = '';
+          if (ui.process) ui.process.disabled = true;
+          if (ui.sessionName) ui.sessionName.value = '';
+
+          if (ui.dash) ui.dash.classList.add('hidden');
+          if (ui.qaSec) ui.qaSec.classList.remove('hidden');
+          if (ui.addBtn) ui.addBtn.classList.add('show');
+          if (ui.status){
+            ui.status.innerHTML = `
+              <div class="status-pill success">
+                <span class="label">Ready</span>
+                <span>Documents processed. You can start asking questions.</span>
+              </div>`;
+          }
+          buildNav();
+          updateResultsToolbar();
+          loadSessions();
+          if (ui.askBtn) ui.askBtn.disabled = false;
+          lastProcessingEstimate = '';
+        }
+
+        if (ev.type === 'error' && ui.status){
+          ui.status.innerHTML = `
+            <div class="status-pill error">
+              <span class="label">Error</span>
+              <span>${escapeHTML(ev.message || 'An unexpected error occurred.')}</span>
+            </div>`;
+          lastProcessingEstimate = '';
+        }
+      }
+
+      function addCard(d){
+        const safeId = d.source_filename ? d.source_filename.replace(/[^a-z0-9]/gi,'') : String(Date.now());
+        const id = 'c-' + safeId;
+        let card = qs('#'+id);
+        if (card) card.remove();
+
+        const isError = ('error' in d);
+        const titleText = d.source_filename || 'Document';
+
+        card = document.createElement('div');
+        card.className = 'summary-card';
+        card.id = id;
+
+        const summaryHtml = isError
+          ? '<p>' + escapeHTML(d.summary || '') + '</p>'
+          : renderMarkdown(d.summary || '');
+
+        card.innerHTML = `
+          <div class="summary-header ${isError ? 'error':''}">
+            <span class="summary-title" title="${escapeHTML(titleText)}">${escapeHTML(titleText)}</span>
+            <div class="summary-actions">
+              ${isError ? '<span class="summary-tag">Error</span>' : '<span class="summary-tag">Summary</span>'}
+              <button type="button" class="summary-export" data-source="${escapeHTML(titleText)}">
+                <span class="icon">⬇︎</span><span>PDF</span>
+              </button>
+            </div>
+          </div>
+          <div class="summary-body">
+            ${summaryHtml}
+          </div>`;
+
+        ui.results?.appendChild(card);
+        buildNav();
+      }
+
+      function buildNav(){
+        if (!ui.docList) return;
+        ui.docList.innerHTML = '';
+        const cards = ui.results?.querySelectorAll('.summary-card') || [];
+        if (!cards.length){
+          ui.navBtn?.classList.add('hidden');
+          ui.navPanel?.classList.add('hidden');
+          return;
+        }
+        cards.forEach(c => {
+          const title = c.querySelector('.summary-header .summary-title').textContent;
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href='#';
+          a.textContent = title;
+          a.onclick = e => {
+            e.preventDefault();
+            c.scrollIntoView({ behavior:'smooth', block:'start' });
+            ui.navPanel?.classList.add('hidden');
+          };
+          li.appendChild(a);
+          ui.docList.appendChild(li);
+        });
+        ui.navBtn?.classList.remove('hidden');
+      }
+
+      function updateResultsToolbar(){
+        const hasCards = !!ui.results?.querySelector('.summary-card');
+        ui.resultsToolbar?.classList.toggle('hidden', !hasCards);
+      }
+
+      async function downloadSummaryPdf(sourceFilename){
+        if (!currentSession){
+          alert('Open a session before exporting.');
+          return;
+        }
+        if (!sourceFilename){
+          alert('Unable to determine which summary to export.');
+          return;
+        }
+
+        postDownload('/api/export_summary_pdf', {
+          session_id: currentSession,
+          source_filename: sourceFilename
+        });
+      }
+
+      async function downloadAllSummariesPdf(){
+        if (!currentSession){
+          alert('Open a session before exporting.');
+          return;
+        }
+        const cards = ui.results?.querySelectorAll('.summary-card') || [];
+        if (!cards.length){
+          alert('No summaries available to export yet.');
+          return;
+        }
+
+        postDownload('/api/export_all_summaries_pdf', {
+          session_id: currentSession
+        });
+      }
+
+      document.body.addEventListener('click', e => {
+        const exportBtn = e.target.closest('.summary-export');
+        if (exportBtn){
+          const source = exportBtn.dataset.source || '';
+          downloadSummaryPdf(source);
+          return;
+        }
+
+        if (e.target.classList.contains('context-toggle')){
+          e.preventDefault();
+          const box = e.target.nextElementSibling;
+          box.classList.toggle('hidden');
+          e.target.textContent = box.classList.contains('hidden') ? 'Show Context' : 'Hide Context';
+        }
+      });
+
+      ui.exportAllPdf?.addEventListener('click', downloadAllSummariesPdf);
+
+      // ------------------------------------------------
+      // Chat: still SSE streaming
+      // ------------------------------------------------
+      if (ui.askBtn){
+        ui.askBtn.onclick = ask;
+      }
+      ui.qaInput?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey){
+          e.preventDefault();
+          ask();
+        }
+      });
+
+      async function ask(){
+        const q = ui.qaInput?.value.trim();
+        if (!q || !currentSession) return;
+
+        const idx = conversation.length;
+        conversation.push({ role:'user', text:q });
+        conversation.push({ role:'bot', text:'', sources:null, thinking:true });
+
+        appendMessageNode(idx);
+        appendMessageNode(idx+1);
+
+        if (ui.qaInput) ui.qaInput.value = '';
+        if (ui.askBtn) ui.askBtn.disabled = true;
+
+        followBottom = true;
+        hideJumpButton();
+
+        await sseFetch('/api/ask_question', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ session_id:currentSession, question:q })
+        }, ev => handleChatEvent(ev, idx+1));
+      }
+
+      // ------------------------------------------------
+      // Chat SSE handler
+      // ------------------------------------------------
+      function handleChatEvent(ev, botIdx){
+        if (ev.type === 'chunk' && typeof ev.token === 'string'){
+          conversation[botIdx].thinking = false;
+          conversation[botIdx].text = (conversation[botIdx].text || '') + ev.token;
+
+          if (followBottom && ui.chatHist){
+            ui.chatHist.scrollTop = ui.chatHist.scrollHeight;
+          } else {
+            showJumpButton();
+          }
+        }
+
+        if (ev.type === 'done'){
+          conversation[botIdx].thinking = false;
+          if (!conversation[botIdx].text && typeof ev.text === 'string'){
+            conversation[botIdx].text = ev.text;
+          }
+          conversation[botIdx].sources = ev.sources || null;
+
+          renderChatInitial();
+
+          if (ui.askBtn) ui.askBtn.disabled = false;
+          followBottom = true;
+          if (ui.chatHist){
+            ui.chatHist.scrollTop = ui.chatHist.scrollHeight;
+          }
+          hideJumpButton();
+        }
+
+        if (ev.type === 'error'){
+          conversation[botIdx].thinking = false;
+          conversation[botIdx].text = 'Error: ' + (ev.message || 'Unknown');
+          conversation[botIdx].sources = null;
+
+          renderChatInitial();
+
+          if (ui.askBtn) ui.askBtn.disabled = false;
+          if (!followBottom) showJumpButton();
+        }
+      }
+
+      function renderChatInitial(){
+        if (!ui.chatHist) return;
+        ui.chatHist.innerHTML = '';
+        conversation.forEach((_, i) => appendMessageNode(i));
+      }
+
+      function appendMessageNode(i){
+        const m = conversation[i];
+        const wrap = document.createElement('div');
+        wrap.className = `chat-message ${m.role}-message${m.thinking ? ' thinking':''}`;
+        wrap.dataset.idx = String(i);
+
+        const bub = document.createElement('div');
+        bub.className = 'message-bubble';
+
+        if (m.thinking){
+          bub.innerHTML = '<span class="spinner"></span><span>Thinking…</span>';
+        } else {
+          if (m.role === 'user'){
+            bub.textContent = m.text || '';
+          } else {
+            bub.innerHTML = renderMarkdown(m.text || '');
+          }
+        }
+
+        wrap.appendChild(bub);
+
+        if (m.role === 'bot' && m.sources?.length){
+          const wrapCtx = document.createElement('div');
+          wrapCtx.className = 'context-wrap';
+          const t = document.createElement('a');
+          t.className = 'context-toggle';
+          t.href='#';
+          t.textContent='Show Context';
+          const box = document.createElement('div');
+          box.className='context-box hidden';
+          const ul = document.createElement('ul');
+          m.sources.forEach(s => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <div class="context-source">From ${escapeHTML(s.source_filename)} (Page ${s.page_number})</div>
+              <div class="context-text">${escapeHTML(s.text)}</div>`;
+            ul.appendChild(li);
+          });
+          box.appendChild(ul);
+          wrapCtx.appendChild(t);
+          wrapCtx.appendChild(box);
+          wrap.appendChild(wrapCtx);
+        }
+
+        ui.chatHist?.appendChild(wrap);
+
+        if (followBottom && ui.chatHist){
+          ui.chatHist.scrollTop = ui.chatHist.scrollHeight;
+          hideJumpButton();
+        } else {
+          showJumpButton();
+        }
+      }
+
+      setupJumpButton();
+      loadSessions();
+
+    });
+  </script>
+  {% else %}
+  <!-- Unauthenticated view: simple login hero -->
+  <div class="main login-main">
+    <div class="login-card">
+      <h2>Sign in to use Intelligent Document Assistant</h2>
+      <p>
+        Upload documents, generate summaries,
+        and ask questions - all in one place. Please sign in with your organization account
+        to get started.
+      </p>
+      <a class="login-btn" href="/login">Sign in</a>
+      <small>If you believe you should have access but cannot sign in, please contact your application administrator.</small>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>
