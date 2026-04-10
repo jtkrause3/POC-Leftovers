@@ -1,0 +1,8 @@
+flask
+python-dotenv
+openai
+azure-ai-documentintelligence
+azure-core
+PyMuPDF
+requests
+gunicorn
